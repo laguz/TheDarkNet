@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(macOS)
+import ServiceManagement
+#endif
 
 struct ContentView: View {
     @State private var nsecInput: String = ""
@@ -60,7 +63,14 @@ struct ContentView: View {
             statusMessage = "Connected as fd00:..." // normally would derive the IP
 
             // Start launchd agents
-            // In a real app we'd use SMAppService.agent(plistName: "com.thedarknet.agent.plist").register()
+            #if os(macOS)
+            do {
+                try SMAppService.agent(plistName: "com.thedarknet.agent.plist").register()
+                try SMAppService.agent(plistName: "com.thedarknet.hyperd.plist").register()
+            } catch {
+                print("Failed to register launchd agents: \(error.localizedDescription)")
+            }
+            #endif
         } catch {
             statusMessage = "Failed to save nsec: \(error.localizedDescription)"
         }
