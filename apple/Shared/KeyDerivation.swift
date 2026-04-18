@@ -76,7 +76,7 @@ struct KeyDerivation {
         for _ in 0..<len {
             let nextIndex = string.index(index, offsetBy: 2)
             let bytes = string[index..<nextIndex]
-            if let var num = UInt8(bytes, radix: 16) {
+            if let num = UInt8(bytes, radix: 16) {
                 data.append(&num, count: 1)
             } else {
                 throw KeyDerivationError.decodeError

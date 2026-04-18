@@ -3,18 +3,19 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.thedarknet.agent</string>
+    <string>com.thedarknet.hyperd</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/local/bin/thedarknet-agent</string>
+        <string>/usr/local/bin/node</string>
+        <string>/Applications/TheDarkNet.app/Contents/Resources/hyperd/index.js</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
     <key>StandardErrorPath</key>
-    <string>/tmp/thedarknet-agent.err</string>
+    <string>/tmp/thedarknet-hyperd.err</string>
     <key>StandardOutPath</key>
-    <string>/tmp/thedarknet-agent.out</string>
+    <string>/tmp/thedarknet-hyperd.out</string>
 </dict>
 </plist>
