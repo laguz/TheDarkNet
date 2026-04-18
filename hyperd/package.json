@@ -1,0 +1,13 @@
+{
+  "name": "hyperd",
+  "version": "1.0.0",
+  "description": "Hyperswarm sidecar for DHT + hole punch",
+  "main": "index.js",
+  "dependencies": {
+    "b4a": "^1.6.4",
+    "hypercore": "^10.0.0",
+    "hyperdht": "^6.0.0",
+    "hyperswarm": "^4.0.0",
+    "nostr-tools": "^2.0.0"
+  }
+}

@@ -1,0 +1,32 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 54;
+	objects = {
+		/* Begin PBXProject section */
+		1234567890ABCDEF12345678 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 1300;
+			};
+			buildConfigurationList = 1234567890ABCDEF12345679 /* Build configuration list for PBXProject "TheDarkNet" */;
+			compatibilityVersion = "Xcode 13.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 1234567890ABCDEF1234567A /* TheDarkNet */;
+			productRefGroup = 1234567890ABCDEF1234567B /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+			);
+		};
+		/* End PBXProject section */
+	};
+	rootObject = 1234567890ABCDEF12345678 /* Project object */;
+}
