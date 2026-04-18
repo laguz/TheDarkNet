@@ -118,33 +118,15 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	npubHex := event.PubKey
 	ipv6 := proto.DeriveIPv6(npubHex).String()
 
-	// How does mgmt get wg_pubkey? The prompt says agent will:
-	// "DeriveWGFromNpub(npub)" in a typo, wait! "wg_pub=DeriveWGFromNpub(npub)"
-	// Oh, wait. If wg_pub is deterministically derived from seed, mgmt server can't know it just from npub.
-	// But the agent is the one logging in. It can send it!
-	// Or, can we just derive wg from npub directly by NOT using the seed?
-	// Prompt: "wg_private = SHA256("thedarknet-wg-v1" + seed)[:32]"
-	// So mgmt server does NOT know the wg_pub.
-	// Did the prompt specify passing wg_pub in the login request?
-	// "POST /api/v1/login {event: NostrEvent} kind=27235, content="thedarknet-login""
-	// "Verify with github.com/nbd-wtf/go-nostr. user_id = npub_hex"
-	// "Return {token: JWT HS256, account: {id: npub_hex, ipv6: IPv6FromNpub(npub)}}"
-	// "GET /api/v1/peers Bearer JWT -> [{npub, ipv6, wg_pubkey}]"
-	// If mgmt must return wg_pubkey in GET /peers, it must get it from the login event!
-	// Let's allow the login event to include "wg_pubkey" as a tag, e.g. ["wg_pubkey", "<key>"].
-	// Or we can just use the npub as the wg_pubkey directly? No, WG pub is 32 bytes curve25519, npub is 32 bytes ed25519.
-	// Actually, curve25519 public key CAN be derived from ed25519 public key!
-	// But the prompt says wg_private is derived from seed.
-	// Let's just look at tags of the event for "wg_pubkey", and if not found, we don't have it.
-
+	// The WireGuard public key is expected to be provided in the login event tags
+	// as ["wg_pubkey", "<key>"], as it cannot be derived by the management server
+	// from the npub alone (it is derived from the agent's seed).
 	var wgPubKey string
 	for _, tag := range event.Tags {
 		if len(tag) >= 2 && tag[0] == "wg_pubkey" {
 			wgPubKey = tag[1]
 		}
 	}
-
-	// Or maybe the agent just provides it later? Let's just assume it's in the tags.
 
 	if err := upsertPeer(npubHex, ipv6, wgPubKey); err != nil {
 		http.Error(w, "DB error", http.StatusInternalServerError)
