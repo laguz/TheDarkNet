@@ -1,11 +1,61 @@
 import SwiftUI
+import NetworkExtension
+
 #if os(macOS)
 import ServiceManagement
 #endif
 
+func statusString(for status: NEVPNStatus) -> String {
+    switch status {
+    case .invalid: return "Invalid"
+    case .disconnected: return "Disconnected"
+    case .connecting: return "Connecting"
+    case .connected: return "Connected"
+    case .reasserting: return "Reasserting"
+    case .disconnecting: return "Disconnecting"
+    @unknown default: return "Unknown"
+    }
+}
+
+class TunnelViewModel: ObservableObject {
+    @Published var managers: [NETunnelProviderManager] = []
+
+    init() {
+        loadManagers()
+        NotificationCenter.default.addObserver(self, selector: #selector(vpnStatusDidChange(_:)), name: .NEVPNStatusDidChange, object: nil)
+    }
+
+    func loadManagers() {
+        NETunnelProviderManager.loadAllFromPreferences { managers, error in
+            DispatchQueue.main.async {
+                self.managers = managers ?? []
+            }
+        }
+    }
+
+    @objc func vpnStatusDidChange(_ notification: Notification) {
+        DispatchQueue.main.async {
+            self.objectWillChange.send()
+        }
+    }
+
+    func toggleTunnel(_ manager: NETunnelProviderManager) {
+        if manager.connection.status == .connected || manager.connection.status == .connecting {
+            manager.connection.stopVPNTunnel()
+        } else {
+            do {
+                try manager.connection.startVPNTunnel()
+            } catch {
+                print("Failed to start tunnel: \(error.localizedDescription)")
+            }
+        }
+    }
+}
+
 struct ContentView: View {
     @State private var nsecInput: String = ""
     @State private var statusMessage: String = "Disconnected"
+    @StateObject private var tunnelViewModel = TunnelViewModel()
 
     var body: some View {
         VStack(spacing: 20) {
@@ -31,6 +81,25 @@ struct ContentView: View {
 
             Text(statusMessage)
                 .foregroundColor(.gray)
+
+            if !tunnelViewModel.managers.isEmpty {
+                Text("Tunnels")
+                    .font(.headline)
+
+                List(tunnelViewModel.managers, id: \.self) { manager in
+                    HStack {
+                        Text(manager.localizedDescription ?? "Unknown Tunnel")
+                        Spacer()
+                        Text(statusString(for: manager.connection.status))
+                            .foregroundColor(.gray)
+                        Button(manager.connection.status == .connected || manager.connection.status == .connecting ? "Close" : "Open") {
+                            tunnelViewModel.toggleTunnel(manager)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+                .frame(height: 200)
+            }
         }
         .padding(40)
     }
