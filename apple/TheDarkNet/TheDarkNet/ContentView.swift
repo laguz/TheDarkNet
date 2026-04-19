@@ -3,6 +3,7 @@ import NetworkExtension
 
 #if os(macOS)
 import ServiceManagement
+internal import Combine
 #endif
 
 func statusString(for status: NEVPNStatus) -> String {
