@@ -136,12 +136,44 @@ struct ContentView: View {
             // Set 0600 permissions
             try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: nsecURL.path)
 
-            statusMessage = "Connected as fd00:..." // normally would derive the IP
+            // Configure the VPN tunnel
+            NETunnelProviderManager.loadAllFromPreferences { managers, error in
+                let manager = managers?.first ?? NETunnelProviderManager()
+                let protocolConfiguration = NETunnelProviderProtocol()
 
-            // Install and load launchd agents
-            #if os(macOS)
-            installLaunchdAgents()
-            #endif
+
+                // Name format
+                let nsecSuffix = String(self.nsecInput.suffix(10))
+                manager.localizedDescription = "TheDarkNet - \(nsecSuffix)"
+
+                protocolConfiguration.providerBundleIdentifier = "laguz.TheDarkNet"
+                protocolConfiguration.serverAddress = "TheDarkNet"
+                manager.protocolConfiguration = protocolConfiguration
+                manager.isEnabled = true
+
+                manager.saveToPreferences { error in
+                    if let error = error {
+                        print("Failed to save tunnel: \(error)")
+                        DispatchQueue.main.async {
+                            self.statusMessage = "Failed to save tunnel"
+                        }
+                        return
+                    }
+
+                    // Reload managers
+                    self.tunnelViewModel.loadManagers()
+
+                    DispatchQueue.main.async {
+                        self.statusMessage = "Connected as fd00:..." // normally would derive the IP
+                    }
+
+                    // Install and load launchd agents
+                    #if os(macOS)
+                    self.installLaunchdAgents()
+                    #endif
+                }
+            }
+
         } catch {
             statusMessage = "Failed to save nsec: \(error.localizedDescription)"
         }
