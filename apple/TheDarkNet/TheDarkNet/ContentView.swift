@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(macOS)
+import ServiceManagement
+#endif
 
 struct ContentView: View {
     @State private var nsecInput: String = ""
@@ -14,10 +17,17 @@ struct ContentView: View {
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .frame(width: 300)
 
-            Button("Connect") {
-                connect()
+            HStack {
+                Button("Connect") {
+                    connect()
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button("Disconnect") {
+                    disconnect()
+                }
+                .buttonStyle(.bordered)
             }
-            .buttonStyle(.borderedProminent)
 
             Text(statusMessage)
                 .foregroundColor(.gray)
@@ -68,6 +78,16 @@ struct ContentView: View {
         }
     }
 
+    func disconnect() {
+        statusMessage = "Disconnecting..."
+
+        #if os(macOS)
+        uninstallLaunchdAgents()
+        #endif
+
+        statusMessage = "Disconnected"
+    }
+
     #if os(macOS)
     func installLaunchdAgents() {
         let plistNames = [
@@ -75,60 +95,30 @@ struct ContentView: View {
             "com.thedarknet.hyperd.plist"
         ]
 
-        let fileManager = FileManager.default
-        let homeDir = fileManager.homeDirectoryForCurrentUser
-        let userAgentsDir = homeDir.appendingPathComponent("Library/LaunchAgents")
-
-        // Ensure ~/Library/LaunchAgents exists
-        try? fileManager.createDirectory(at: userAgentsDir, withIntermediateDirectories: true)
-
-        guard let bundleAgentsPath = Bundle.main.resourceURL?
-            .deletingLastPathComponent() // Contents/Resources -> Contents
-            .appendingPathComponent("Library/LaunchAgents") else {
-            print("Failed to locate LaunchAgents in app bundle")
-            return
+        for plistName in plistNames {
+            let agent = SMAppService.agent(plistName: plistName)
+            do {
+                try agent.register()
+                print("Successfully loaded \(plistName)")
+            } catch {
+                print("Failed to register \(plistName): \(error.localizedDescription)")
+            }
         }
+    }
 
-        let uid = getuid()
+    func uninstallLaunchdAgents() {
+        let plistNames = [
+            "com.thedarknet.agent.plist",
+            "com.thedarknet.hyperd.plist"
+        ]
 
         for plistName in plistNames {
-            let sourcePlist = bundleAgentsPath.appendingPathComponent(plistName)
-            let destPlist = userAgentsDir.appendingPathComponent(plistName)
-
-            // Copy plist to ~/Library/LaunchAgents/
+            let agent = SMAppService.agent(plistName: plistName)
             do {
-                if fileManager.fileExists(atPath: destPlist.path) {
-                    // Unload existing agent before replacing
-                    let label = plistName.replacingOccurrences(of: ".plist", with: "")
-                    let unload = Process()
-                    unload.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-                    unload.arguments = ["bootout", "gui/\(uid)/\(label)"]
-                    try? unload.run()
-                    unload.waitUntilExit()
-
-                    try fileManager.removeItem(at: destPlist)
-                }
-                try fileManager.copyItem(at: sourcePlist, to: destPlist)
+                try agent.unregister()
+                print("Successfully unloaded \(plistName)")
             } catch {
-                print("Failed to install \(plistName): \(error.localizedDescription)")
-                continue
-            }
-
-            // Bootstrap the agent via launchctl
-            let label = plistName.replacingOccurrences(of: ".plist", with: "")
-            let load = Process()
-            load.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-            load.arguments = ["bootstrap", "gui/\(uid)", destPlist.path]
-            do {
-                try load.run()
-                load.waitUntilExit()
-                if load.terminationStatus == 0 {
-                    print("Successfully loaded \(label)")
-                } else {
-                    print("launchctl bootstrap returned \(load.terminationStatus) for \(label)")
-                }
-            } catch {
-                print("Failed to bootstrap \(label): \(error.localizedDescription)")
+                print("Failed to unregister \(plistName): \(error.localizedDescription)")
             }
         }
     }
