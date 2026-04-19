@@ -8,7 +8,7 @@
 	</array>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>$(TeamIdentifierPrefix)laguz.TheDarkNet</string>
+		<string>group.</string>
 	</array>
 </dict>
 </plist>
