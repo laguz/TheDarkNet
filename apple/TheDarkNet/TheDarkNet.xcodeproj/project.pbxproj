@@ -6,27 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXShellScriptBuildPhase section */
-		AA0001052F9430EF00927C5C /* Copy LaunchAgents */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"$(SRCROOT)/TheDarkNet/Library/LaunchAgents/com.thedarknet.agent.plist",
-				"$(SRCROOT)/TheDarkNet/Library/LaunchAgents/com.thedarknet.hyperd.plist",
-			);
-			name = "Copy LaunchAgents";
-			outputPaths = (
-				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/Library/LaunchAgents/com.thedarknet.agent.plist",
-				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/Library/LaunchAgents/com.thedarknet.hyperd.plist",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "mkdir -p \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Library/LaunchAgents\"\ncp \"${SRCROOT}/TheDarkNet/Library/LaunchAgents/com.thedarknet.agent.plist\" \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Library/LaunchAgents/\"\ncp \"${SRCROOT}/TheDarkNet/Library/LaunchAgents/com.thedarknet.hyperd.plist\" \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Library/LaunchAgents/\"\n";
-		};
-/* End PBXShellScriptBuildPhase section */
-
 /* Begin PBXFileReference section */
 		8816BB712F9430EF00927C5C /* TheDarkNet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TheDarkNet.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -150,6 +129,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		AA0001052F9430EF00927C5C /* Copy LaunchAgents */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/TheDarkNet/Library/LaunchAgents/com.thedarknet.agent.plist",
+				"$(SRCROOT)/TheDarkNet/Library/LaunchAgents/com.thedarknet.hyperd.plist",
+			);
+			name = "Copy LaunchAgents";
+			outputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/Library/LaunchAgents/com.thedarknet.agent.plist",
+				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/Library/LaunchAgents/com.thedarknet.hyperd.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "mkdir -p \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Library/LaunchAgents\"\ncp \"${SRCROOT}/TheDarkNet/Library/LaunchAgents/com.thedarknet.agent.plist\" \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Library/LaunchAgents/\"\ncp \"${SRCROOT}/TheDarkNet/Library/LaunchAgents/com.thedarknet.hyperd.plist\" \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Library/LaunchAgents/\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		8816BB6D2F9430EF00927C5C /* Sources */ = {
@@ -286,6 +286,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = TheDarkNet/TheDarkNet.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -319,6 +320,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = TheDarkNet/TheDarkNet.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
