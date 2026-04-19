@@ -144,9 +144,9 @@ struct ContentView: View {
 
                 // Name format
                 let nsecSuffix = String(self.nsecInput.suffix(10))
-                manager.localizedDescription = "TheDarkNet - \(nsecSuffix)"
+                manager.localizedDescription = nsecSuffix
 
-                protocolConfiguration.providerBundleIdentifier = "laguz.TheDarkNet"
+                protocolConfiguration.providerBundleIdentifier = "laguz.TheDarkNet.PacketTunnel"
                 protocolConfiguration.serverAddress = "TheDarkNet"
                 manager.protocolConfiguration = protocolConfiguration
                 manager.isEnabled = true
