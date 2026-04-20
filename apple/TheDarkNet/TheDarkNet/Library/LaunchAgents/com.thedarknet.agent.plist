@@ -6,15 +6,24 @@
     <string>com.thedarknet.agent</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/local/bin/thedarknet-agent</string>
+        <string>__TDN_AGENT_PATH__</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
+    <key>ProcessType</key>
+    <string>Interactive</string>
+    <key>LimitLoadToSessionType</key>
+    <string>Aqua</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/thedarknet-agent.err</string>
+    <string>__TDN_LOG_DIR__/agent.err.log</string>
     <key>StandardOutPath</key>
-    <string>/tmp/thedarknet-agent.out</string>
+    <string>__TDN_LOG_DIR__/agent.out.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>TDN_HOME</key>
+        <string>__TDN_HOME__</string>
+    </dict>
 </dict>
 </plist>

@@ -6,16 +6,25 @@
     <string>com.thedarknet.hyperd</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/local/bin/node</string>
-        <string>/Applications/TheDarkNet.app/Contents/Resources/hyperd/index.js</string>
+        <string>__TDN_NODE_PATH__</string>
+        <string>__TDN_HYPERD_SCRIPT__</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
+    <key>ProcessType</key>
+    <string>Interactive</string>
+    <key>LimitLoadToSessionType</key>
+    <string>Aqua</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/thedarknet-hyperd.err</string>
+    <string>__TDN_LOG_DIR__/hyperd.err.log</string>
     <key>StandardOutPath</key>
-    <string>/tmp/thedarknet-hyperd.out</string>
+    <string>__TDN_LOG_DIR__/hyperd.out.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>TDN_HOME</key>
+        <string>__TDN_HOME__</string>
+    </dict>
 </dict>
 </plist>

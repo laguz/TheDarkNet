@@ -2,13 +2,23 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>com.apple.developer.networking.networkextension</key>
-	<array>
-		<string>packet-tunnel-provider</string>
-	</array>
-	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>group.</string>
-	</array>
+    <!--
+      Dev build. NetworkExtension and app-groups entitlements intentionally
+      omitted so a free/personal signing team can issue a profile for
+      `laguz.TheDarkNet.dev`. The tunnel list UI runs fine; actually starting
+      a VPN tunnel (startVPNTunnel) will fail at runtime until the
+      entitlement below is restored AND you've had Apple grant the
+      `packet-tunnel-provider` capability to your team on developer.apple.com.
+
+      To re-enable later:
+        <key>com.apple.developer.networking.networkextension</key>
+        <array>
+            <string>packet-tunnel-provider</string>
+        </array>
+        <key>com.apple.security.application-groups</key>
+        <array>
+            <string>group.FVJC2YSFSA.TheDarkNet</string>
+        </array>
+    -->
 </dict>
 </plist>
