@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -18,9 +19,17 @@ import (
 )
 
 var (
-	jwtSecret = []byte("thedarknet-jwt-secret-dev") // MVP secret
+	jwtSecret []byte
 	db        *sql.DB
 )
+
+func init() {
+	secret := os.Getenv("TDN_JWT_SECRET")
+	if secret == "" {
+		secret = "thedarknet-jwt-secret-dev" // MVP secret fallback
+	}
+	jwtSecret = []byte(secret)
+}
 
 type Account struct {
 	ID       string `json:"id"`
