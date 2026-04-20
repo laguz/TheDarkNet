@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -197,6 +198,19 @@ func main() {
 	http.HandleFunc("/api/v1/login", loginHandler)
 	http.HandleFunc("/api/v1/peers", peersHandler)
 
-	fmt.Println("Starting mgmt server on :33073")
-	log.Fatal(http.ListenAndServe(":33073", nil))
+	addr := os.Getenv("TDN_MGMT_ADDR")
+	if addr == "" {
+		addr = ":33073"
+	}
+
+	certFile := os.Getenv("TDN_MGMT_CERT")
+	keyFile := os.Getenv("TDN_MGMT_KEY")
+
+	if certFile != "" && keyFile != "" {
+		fmt.Printf("Starting mgmt server on %s (HTTPS)\n", addr)
+		log.Fatal(http.ListenAndServeTLS(addr, certFile, keyFile, nil))
+	} else {
+		fmt.Printf("Starting mgmt server on %s (HTTP)\n", addr)
+		log.Fatal(http.ListenAndServe(addr, nil))
+	}
 }

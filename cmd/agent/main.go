@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	mgmtURL = "http://127.0.0.1:33073"
+	mgmtURL  string
 	jwtToken string
 	appDir   string
 )
@@ -33,6 +33,11 @@ func init() {
 		log.Fatalf("Failed to get home dir: %v", err)
 	}
 	appDir = filepath.Join(home, "Library", "Application Support", "TheDarkNet")
+
+	mgmtURL = os.Getenv("TDN_MGMT_URL")
+	if mgmtURL == "" {
+		mgmtURL = "http://127.0.0.1:33073"
+	}
 }
 
 func readNsec() string {
