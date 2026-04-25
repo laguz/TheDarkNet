@@ -25,6 +25,7 @@ var (
 	mgmtURL  string
 	jwtToken string
 	appDir   string
+	wgIface  string
 )
 
 func init() {
@@ -37,6 +38,11 @@ func init() {
 	mgmtURL = os.Getenv("TDN_MGMT_URL")
 	if mgmtURL == "" {
 		mgmtURL = "http://127.0.0.1:33073"
+	}
+
+	wgIface = os.Getenv("TDN_WG_IFACE")
+	if wgIface == "" {
+		wgIface = "utun8"
 	}
 }
 
@@ -150,7 +156,7 @@ func getEndpointsFromHyperd() (map[string]string, error) {
 }
 
 func setupWireGuard(wgPriv []byte, ipv6 string) error {
-	ifName := "utun8"
+	ifName := wgIface
 
 	client, err := wgctrl.New()
 	if err != nil {
@@ -263,7 +269,7 @@ func main() {
 	}
 	log.Println("Logged into mgmt")
 
-	ifName := "utun8"
+	ifName := wgIface
 	if err := setupWireGuard(wgPriv, ipv6); err != nil {
 		log.Printf("WireGuard setup error: %v", err)
 	}
