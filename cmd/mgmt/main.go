@@ -134,7 +134,13 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	for _, tag := range event.Tags {
 		if len(tag) >= 2 && tag[0] == "wg_pubkey" {
 			wgPubKey = tag[1]
+			break
 		}
+	}
+
+	if !isValidWGPubKey(wgPubKey) {
+		http.Error(w, "Invalid wg_pubkey", http.StatusBadRequest)
+		return
 	}
 
 	if err := upsertPeer(npubHex, ipv6, wgPubKey); err != nil {
