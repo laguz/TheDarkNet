@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nbd-wtf/go-nostr"
@@ -25,9 +26,15 @@ var (
 	mgmtURL  string
 	jwtToken string
 	appDir   string
+	pskCache struct {
+		sync.RWMutex
+		m map[string]wgtypes.Key
+	}
 )
 
 func init() {
+	pskCache.m = make(map[string]wgtypes.Key)
+
 	home, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatalf("Failed to get home dir: %v", err)
@@ -218,8 +225,21 @@ func syncPeers(client *wgctrl.Client, ifName string, wgPriv []byte, npub string)
 		}
 
 		var psk wgtypes.Key
-		pskBytes := proto.DerivePSK(npub, peerNpub)
-		copy(psk[:], pskBytes)
+		cacheKey := npub + ":" + peerNpub
+		pskCache.RLock()
+		cached, ok := pskCache.m[cacheKey]
+		pskCache.RUnlock()
+
+		if ok {
+			psk = cached
+		} else {
+			pskBytes := proto.DerivePSK(npub, peerNpub)
+			copy(psk[:], pskBytes)
+
+			pskCache.Lock()
+			pskCache.m[cacheKey] = psk
+			pskCache.Unlock()
+		}
 
 		wgPeers = append(wgPeers, wgtypes.PeerConfig{
 			PublicKey:         peerWgPub,
