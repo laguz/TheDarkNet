@@ -50,3 +50,40 @@ func TestKeyDerivations(t *testing.T) {
 		t.Fatal("decode mismatch")
 	}
 }
+
+func TestDecodeNsec(t *testing.T) {
+	validSeed := make([]byte, 32)
+	for i := range validSeed {
+		validSeed[i] = 0xab
+	}
+	validHex := hex.EncodeToString(validSeed)
+
+	tests := []struct {
+		name    string
+		nsec    string
+		wantErr bool
+	}{
+		{"valid hex", validHex, false},
+		{"invalid hex length (too short)", validHex[:63], true},
+		{"invalid hex length (too long)", validHex + "0", true},
+		{"invalid hex characters", "z" + validHex[1:], true},
+		{"empty string", "", true},
+		{"nsec1 prefix but too short", "nsec1", true},
+		{"nsec1 prefix with invalid bech32", "nsec1invalidchars!!", true},
+		{"invalid bech32 nsec1 (too short)", "nsec1qqqq", true},
+		{"invalid bech32 nsec1 (invalid checksum)", "nsec1800d642clcd630czradxe7ww9665v066v2ueu7863p6f7sc94x7shnll07", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := DecodeNsec(tt.nsec)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DecodeNsec(%q) error = %v, wantErr %v", tt.nsec, err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && hex.EncodeToString(got) != tt.nsec {
+				t.Errorf("DecodeNsec(%q) = %x, want %s", tt.nsec, got, tt.nsec)
+			}
+		})
+	}
+}
