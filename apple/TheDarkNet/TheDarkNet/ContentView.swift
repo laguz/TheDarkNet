@@ -432,7 +432,7 @@ final class TunnelViewModel: ObservableObject {
         tunnels.append(config)
         store.save(tunnels)
         #if os(macOS)
-        lastError = "Tunnel saved. Install wireguard-tools to bring it up: \(WireGuardRunner.installHint)"
+        lastError = "Tunnel saved. Install the userspace toolchain to bring it up: \(WireGuardRunner.installHint)"
         #endif
     }
 
@@ -498,7 +498,7 @@ final class TunnelViewModel: ObservableObject {
     #if os(macOS)
     private func bringUp(_ tunnel: TunnelConfig) {
         guard WireGuardRunner.toolchainAvailable else {
-            lastError = "wireguard-tools not installed. Run: \(WireGuardRunner.installHint)"
+            lastError = "Userspace toolchain missing. Run: \(WireGuardRunner.installHint)"
             return
         }
         guard let nsec = fetchNsec(for: tunnel.id) else {
@@ -733,20 +733,50 @@ struct ContentView: View {
         .padding(14)
     }
 
-    // MARK: dev-mode banner
+    // MARK: toolchain banner
+    //
+    // Live status strip under the header. Green when wireguard-tools is on
+    // disk (real tunnels will come up on paste, behind one admin prompt);
+    // orange when it isn't, with the exact brew command to fix it.
 
     private var devBanner: some View {
         HStack(spacing: 8) {
+            #if os(macOS)
+            if vm.toolchainAvailable {
+                Image(systemName: "checkmark.seal.fill")
+                    .foregroundColor(.green)
+                Text("wireguard-go ready · admin prompt on connect")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(.orange)
+                Text("Missing userspace toolchain · run `\(WireGuardRunner.installHint)`")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer(minLength: 6)
+                Button("Copy") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(WireGuardRunner.installHint,
+                                                    forType: .string)
+                }
+                .buttonStyle(.borderless)
+                .controlSize(.small)
+            }
+            #else
             Image(systemName: "wrench.and.screwdriver")
                 .foregroundColor(.orange)
-            Text("Dev mode · tunnels are simulated until NetworkExtension is enabled")
+            Text("Dev mode")
                 .font(.caption)
                 .foregroundColor(.secondary)
+            #endif
             Spacer()
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
-        .background(Color.orange.opacity(0.10))
+        .background(
+            (vm.toolchainAvailable ? Color.green : Color.orange).opacity(0.10)
+        )
     }
 
     // MARK: local tunnels list
@@ -818,9 +848,22 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Add Tunnel")
                 .font(.title3).bold()
-            Text("Paste your nsec. Your key stays on this machine — it's written to your user keychain and a 0600 file in ~/Library.")
+            Text("Paste your nsec. Keys are derived locally; the nsec is stored in your user keychain (scoped to this tunnel).")
                 .font(.caption)
                 .foregroundColor(.secondary)
+            #if os(macOS)
+            if vm.toolchainAvailable {
+                Label("macOS will prompt for your admin password once to start the tunnel.",
+                      systemImage: "lock.shield")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            } else {
+                Label("Userspace toolchain missing — the tunnel will be saved but not started. Install with: \(WireGuardRunner.installHint)",
+                      systemImage: "exclamationmark.triangle")
+                    .font(.caption2)
+                    .foregroundColor(.orange)
+            }
+            #endif
             SecureField("nsec1…", text: $nsecInput)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
 

@@ -7,6 +7,7 @@ import CryptoKit
 
 enum WireGuardError: LocalizedError {
     case wgQuickNotFound
+    case bashTooOld
     case adminCanceled
     case commandFailed(Int32, String)
 
@@ -14,6 +15,8 @@ enum WireGuardError: LocalizedError {
         switch self {
         case .wgQuickNotFound:
             return "wireguard-tools not found. Install with: brew install wireguard-tools"
+        case .bashTooOld:
+            return "wg-quick needs bash 4+. Install with: brew install bash"
         case .adminCanceled:
             return "Admin permission denied"
         case .commandFailed(let code, let msg):
@@ -45,16 +48,36 @@ final class WireGuardRunner {
         locate("wg")
     }
 
-    /// True iff both wg-quick and wg are on disk. That's enough for up/down.
-    /// (wg-quick internally invokes wireguard-go on macOS, which ships with
-    /// the same Homebrew package, so if wg-quick is present wireguard-go is
-    /// effectively guaranteed.)
-    static var toolchainAvailable: Bool {
-        locateWgQuick() != nil && locateWg() != nil
+    /// Locates a bash 4+ binary. The system `/bin/bash` on macOS is stuck at
+    /// 3.2 (GPLv3 licensing), which wg-quick explicitly refuses to run on.
+    /// We check Homebrew's usual prefixes first, then fall back to
+    /// ~/.local/bin. Returns nil if only the stock bash is available.
+    static func locateBash4() -> String? {
+        let candidates = [
+            "/opt/homebrew/bin/bash",
+            "/usr/local/bin/bash",
+            "\(NSHomeDirectory())/.local/bin/bash",
+            "/opt/local/bin/bash",   // MacPorts
+        ]
+        for p in candidates where FileManager.default.isExecutableFile(atPath: p) {
+            return p
+        }
+        return nil
     }
 
-    /// Single place to tell the user how to install the toolchain.
-    static let installHint = "brew install wireguard-tools"
+    /// True iff both wg-quick and wg are on disk **and** a bash 4+ interpreter
+    /// is available to run wg-quick. wg-quick's shebang is
+    /// `#!/usr/bin/env bash`, but under osascript's minimal PATH `env` resolves
+    /// to /bin/bash (3.2), which wg-quick refuses — hence we check for a real
+    /// bash too.
+    static var toolchainAvailable: Bool {
+        locateWgQuick() != nil && locateWg() != nil && locateBash4() != nil
+    }
+
+    /// Single place to tell the user how to install the toolchain. The bash
+    /// dependency is called out separately because `brew install wireguard-tools`
+    /// does not always pull it in.
+    static let installHint = "brew install wireguard-tools bash"
 
     private static func locate(_ bin: String) -> String? {
         let candidates = [
@@ -68,6 +91,13 @@ final class WireGuardRunner {
         }
         return nil
     }
+
+    /// PATH we inject before running wg-quick. Needs to include whichever
+    /// brew prefix actually has wg/wireguard-go/bash; we prepend both common
+    /// ones so it works on Apple Silicon and Intel. The tail is the default
+    /// `do shell script` PATH.
+    private static let execPath =
+        "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
     // MARK: config file layout
 
@@ -158,15 +188,14 @@ final class WireGuardRunner {
     /// the auth dialog — treat that as a soft failure, not a crash.
     @discardableResult
     func up(_ tunnel: TunnelConfig, nsec: String) throws -> String {
-        guard let wgQuick = Self.locateWgQuick() else {
-            throw WireGuardError.wgQuickNotFound
-        }
+        let (bash, wgQuick) = try locateTooling()
 
         let keys = try Self.deriveKeys(fromNsec: nsec)
         let configURL = try Self.writeConfig(for: tunnel, keys: keys)
 
         try runAsAdmin(
-            command: "\(shellQuote(wgQuick)) up \(shellQuote(configURL.path))",
+            command: wgQuickCommand(bash: bash, wgQuick: wgQuick,
+                                    action: "up", configPath: configURL.path),
             prompt: "TheDarkNet wants to start the tunnel \(tunnel.name)."
         )
 
@@ -176,21 +205,43 @@ final class WireGuardRunner {
     /// Bring tunnel down. Missing config file is non-fatal — the tunnel may
     /// have been removed externally.
     func down(_ tunnel: TunnelConfig) throws {
-        guard let wgQuick = Self.locateWgQuick() else {
-            throw WireGuardError.wgQuickNotFound
-        }
+        let (bash, wgQuick) = try locateTooling()
         let configURL = Self.configPath(for: tunnel)
         guard FileManager.default.fileExists(atPath: configURL.path) else {
             return
         }
 
         try runAsAdmin(
-            command: "\(shellQuote(wgQuick)) down \(shellQuote(configURL.path))",
+            command: wgQuickCommand(bash: bash, wgQuick: wgQuick,
+                                    action: "down", configPath: configURL.path),
             prompt: "TheDarkNet wants to stop the tunnel \(tunnel.name)."
         )
     }
 
     // MARK: helpers
+
+    /// Resolves wg-quick + bash 4+, surfacing the specific missing piece.
+    private func locateTooling() throws -> (bash: String, wgQuick: String) {
+        guard let wgQuick = Self.locateWgQuick() else {
+            throw WireGuardError.wgQuickNotFound
+        }
+        guard let bash = Self.locateBash4() else {
+            throw WireGuardError.bashTooOld
+        }
+        return (bash, wgQuick)
+    }
+
+    /// Builds the command string passed to `do shell script`. We invoke bash
+    /// 4+ explicitly (bypassing wg-quick's `#!/usr/bin/env bash` shebang, which
+    /// would otherwise find /bin/bash 3.2 under osascript's minimal PATH), and
+    /// prepend Homebrew's prefix so wg-quick's own calls to `wg`,
+    /// `wireguard-go`, `networksetup`, etc., resolve correctly.
+    private func wgQuickCommand(
+        bash: String, wgQuick: String, action: String, configPath: String
+    ) -> String {
+        "PATH=\(Self.execPath) " +
+        "\(shellQuote(bash)) \(shellQuote(wgQuick)) \(action) \(shellQuote(configPath))"
+    }
 
     private func shellQuote(_ s: String) -> String {
         "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
