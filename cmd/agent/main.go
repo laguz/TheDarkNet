@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -155,8 +156,17 @@ func getEndpointsFromHyperd() (map[string]string, error) {
 	return endpoints, nil
 }
 
+var ifaceNameRegex = regexp.MustCompile(`^[a-zA-Z0-9]+$`)
+
+func isValidIface(ifName string) bool {
+	return ifaceNameRegex.MatchString(ifName)
+}
+
 func setupWireGuard(wgPriv []byte, ipv6 string) error {
 	ifName := wgIface
+	if !isValidIface(ifName) {
+		return fmt.Errorf("invalid interface name: %s", ifName)
+	}
 
 	client, err := wgctrl.New()
 	if err != nil {
