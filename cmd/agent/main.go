@@ -71,9 +71,9 @@ func loginToMgmt(seed []byte, npubHex, wgPubKeyHex string) error {
 	ev := nostr.Event{
 		PubKey:    npubHex,
 		CreatedAt: nostr.Now(),
-		Kind:      27235,
+		Kind:      proto.LoginEventKind,
 		Tags:      nostr.Tags{{"wg_pubkey", wgPubKeyHex}},
-		Content:   "thedarknet-login",
+		Content:   proto.LoginEventContent,
 	}
 
 	privHex := hex.EncodeToString(seed)
