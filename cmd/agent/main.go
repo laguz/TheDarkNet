@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"sync"
+
 	"github.com/nbd-wtf/go-nostr"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -26,6 +28,17 @@ var (
 	jwtToken string
 	appDir   string
 	wgIface  string
+)
+
+type peerCacheEntry struct {
+	wgPub wgtypes.Key
+	ipNet net.IPNet
+	psk   wgtypes.Key
+}
+
+var (
+	peerCache = make(map[string]peerCacheEntry)
+	cacheMu   sync.RWMutex
 )
 
 func init() {
@@ -210,28 +223,46 @@ func syncPeers(client *wgctrl.Client, ifName string, wgPriv []byte, npub string)
 			continue
 		}
 
-		peerWgPubHex := p["wg_pubkey"].(string)
-		peerWgPubBytes, _ := hex.DecodeString(peerWgPubHex)
-		var peerWgPub wgtypes.Key
-		copy(peerWgPub[:], peerWgPubBytes)
+		cacheKey := npub + ":" + peerNpub
 
-		peerIPv6 := p["ipv6"].(string)
-		_, peerIPNet, _ := net.ParseCIDR(peerIPv6 + "/128")
+		cacheMu.RLock()
+		entry, ok := peerCache[cacheKey]
+		cacheMu.RUnlock()
+
+		if !ok {
+			peerWgPubHex := p["wg_pubkey"].(string)
+			peerWgPubBytes, _ := hex.DecodeString(peerWgPubHex)
+			var peerWgPub wgtypes.Key
+			copy(peerWgPub[:], peerWgPubBytes)
+
+			peerIPv6 := p["ipv6"].(string)
+			_, peerIPNet, _ := net.ParseCIDR(peerIPv6 + "/128")
+
+			var psk wgtypes.Key
+			pskBytes := proto.DerivePSK(npub, peerNpub)
+			copy(psk[:], pskBytes)
+
+			entry = peerCacheEntry{
+				wgPub: peerWgPub,
+				ipNet: *peerIPNet,
+				psk:   psk,
+			}
+
+			cacheMu.Lock()
+			peerCache[cacheKey] = entry
+			cacheMu.Unlock()
+		}
 
 		var endpoint *net.UDPAddr
 		if epStr, ok := endpoints[peerNpub]; ok && epStr != "" {
 			endpoint, _ = net.ResolveUDPAddr("udp", epStr)
 		}
 
-		var psk wgtypes.Key
-		pskBytes := proto.DerivePSK(npub, peerNpub)
-		copy(psk[:], pskBytes)
-
 		wgPeers = append(wgPeers, wgtypes.PeerConfig{
-			PublicKey:         peerWgPub,
-			PresharedKey:      &psk,
+			PublicKey:         entry.wgPub,
+			PresharedKey:      &entry.psk,
 			ReplaceAllowedIPs: true,
-			AllowedIPs:        []net.IPNet{*peerIPNet},
+			AllowedIPs:        []net.IPNet{entry.ipNet},
 			Endpoint:          endpoint,
 		})
 	}
