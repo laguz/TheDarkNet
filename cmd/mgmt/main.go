@@ -113,7 +113,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	event := req.Event
-	if event.Kind != 27235 || event.Content != "thedarknet-login" {
+	if event.Kind != proto.LoginEventKind || event.Content != proto.LoginEventContent {
 		http.Error(w, "Invalid event kind or content", http.StatusBadRequest)
 		return
 	}
