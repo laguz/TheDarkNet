@@ -117,7 +117,13 @@ func loginToMgmt(seed []byte, npubHex, wgPubKeyHex string) error {
 	return nil
 }
 
-func getPeersFromMgmt() ([]map[string]interface{}, error) {
+type Peer struct {
+	ID       string `json:"id"`
+	WGPubKey string `json:"wg_pubkey"`
+	IPv6     string `json:"ipv6"`
+}
+
+func getPeersFromMgmt() ([]Peer, error) {
 	req, _ := http.NewRequest("GET", mgmtURL+"/api/v1/peers", nil)
 	req.Header.Set("Authorization", "Bearer "+jwtToken)
 
@@ -131,7 +137,7 @@ func getPeersFromMgmt() ([]map[string]interface{}, error) {
 		return nil, fmt.Errorf("get peers failed with status %d", resp.StatusCode)
 	}
 
-	var peers []map[string]interface{}
+	var peers []Peer
 	if err := json.NewDecoder(resp.Body).Decode(&peers); err != nil {
 		return nil, fmt.Errorf("decode peers: %w", err)
 	}
@@ -247,7 +253,7 @@ func syncPeers(client *wgctrl.Client, ifName string, wgPriv []byte, npub string)
 	var wgPeers []wgtypes.PeerConfig
 
 	for _, p := range peers {
-		peerNpub := p["id"].(string)
+		peerNpub := p.ID
 		if peerNpub == npub {
 			continue
 		}
@@ -259,12 +265,12 @@ func syncPeers(client *wgctrl.Client, ifName string, wgPriv []byte, npub string)
 		cacheMu.RUnlock()
 
 		if !ok {
-			peerWgPubHex := p["wg_pubkey"].(string)
+			peerWgPubHex := p.WGPubKey
 			peerWgPubBytes, _ := hex.DecodeString(peerWgPubHex)
 			var peerWgPub wgtypes.Key
 			copy(peerWgPub[:], peerWgPubBytes)
 
-			peerIPv6 := p["ipv6"].(string)
+			peerIPv6 := p.IPv6
 			_, peerIPNet, _ := net.ParseCIDR(peerIPv6 + "/128")
 
 			var psk wgtypes.Key
