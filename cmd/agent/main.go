@@ -319,7 +319,7 @@ func main() {
 	log.Println("Logged into mgmt")
 
 	ifName := wgIface
-	if err := setupWireGuard(wgPriv, ipv6); err != nil {
+	if err := setupWireGuard(ifName, wgPriv, ipv6); err != nil {
 		log.Printf("WireGuard setup error: %v", err)
 	}
 
