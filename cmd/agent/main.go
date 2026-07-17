@@ -11,8 +11,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
+
+	"sync"
 
 	"github.com/nbd-wtf/go-nostr"
 	"golang.zx2c4.com/wireguard/wgctrl"
@@ -26,6 +29,17 @@ var (
 	jwtToken string
 	appDir   string
 	wgIface  string
+)
+
+type peerCacheEntry struct {
+	wgPub wgtypes.Key
+	ipNet net.IPNet
+	psk   wgtypes.Key
+}
+
+var (
+	peerCache = make(map[string]peerCacheEntry)
+	cacheMu   sync.RWMutex
 )
 
 func init() {
@@ -71,9 +85,9 @@ func loginToMgmt(seed []byte, npubHex, wgPubKeyHex string) error {
 	ev := nostr.Event{
 		PubKey:    npubHex,
 		CreatedAt: nostr.Now(),
-		Kind:      27235,
+		Kind:      proto.LoginEventKind,
 		Tags:      nostr.Tags{{"wg_pubkey", wgPubKeyHex}},
-		Content:   "thedarknet-login",
+		Content:   proto.LoginEventContent,
 	}
 
 	privHex := hex.EncodeToString(seed)
@@ -103,7 +117,13 @@ func loginToMgmt(seed []byte, npubHex, wgPubKeyHex string) error {
 	return nil
 }
 
-func getPeersFromMgmt() ([]map[string]interface{}, error) {
+type Peer struct {
+	ID       string `json:"id"`
+	WGPubKey string `json:"wg_pubkey"`
+	IPv6     string `json:"ipv6"`
+}
+
+func getPeersFromMgmt() ([]Peer, error) {
 	req, _ := http.NewRequest("GET", mgmtURL+"/api/v1/peers", nil)
 	req.Header.Set("Authorization", "Bearer "+jwtToken)
 
@@ -117,7 +137,7 @@ func getPeersFromMgmt() ([]map[string]interface{}, error) {
 		return nil, fmt.Errorf("get peers failed with status %d", resp.StatusCode)
 	}
 
-	var peers []map[string]interface{}
+	var peers []Peer
 	if err := json.NewDecoder(resp.Body).Decode(&peers); err != nil {
 		return nil, fmt.Errorf("decode peers: %w", err)
 	}
@@ -155,7 +175,46 @@ func getEndpointsFromHyperd() (map[string]string, error) {
 	return endpoints, nil
 }
 
-func setupWireGuard(ifName string, wgPriv []byte, ipv6 string) error {
+var ifaceNameRegex = regexp.MustCompile(`^[a-zA-Z0-9]+$`)
+
+func isValidIface(ifName string) bool {
+	return ifaceNameRegex.MatchString(ifName)
+}
+
+func configureDeviceWithFallback(client *wgctrl.Client, ifName string, cfg wgtypes.Config) error {
+	err := client.ConfigureDevice(ifName, cfg)
+	if err != nil {
+		log.Printf("Failed to configure %s, trying to create it via wireguard-go... (%v)", ifName, err)
+		if out, err := exec.Command("wireguard-go", ifName).CombinedOutput(); err != nil {
+			log.Printf("Warning: wireguard-go failed: %v, output: %s", err, string(out))
+		}
+		time.Sleep(1 * time.Second)
+		err = client.ConfigureDevice(ifName, cfg)
+		if err != nil {
+			return fmt.Errorf("configure device %s: %w", ifName, err)
+		}
+	}
+	return nil
+}
+
+func configureIface(ifName string, ipv6 string) {
+	if out, err := exec.Command("ifconfig", ifName, "inet6", ipv6+"/128", "alias").CombinedOutput(); err != nil {
+		log.Printf("Warning: failed to add ipv6 alias: %v, output: %s", err, string(out))
+	}
+	if out, err := exec.Command("ifconfig", ifName, "mtu", "1280").CombinedOutput(); err != nil {
+		log.Printf("Warning: failed to set mtu: %v, output: %s", err, string(out))
+	}
+	if out, err := exec.Command("ifconfig", ifName, "up").CombinedOutput(); err != nil {
+		log.Printf("Warning: failed to bring interface up: %v, output: %s", err, string(out))
+	}
+}
+
+func setupWireGuard(wgPriv []byte, ipv6 string) error {
+	ifName := wgIface
+	if !isValidIface(ifName) {
+		return fmt.Errorf("invalid interface name: %s", ifName)
+	}
+
 	client, err := wgctrl.New()
 	if err != nil {
 		return fmt.Errorf("wgctrl new: %w", err)
@@ -171,20 +230,11 @@ func setupWireGuard(ifName string, wgPriv []byte, ipv6 string) error {
 		ListenPort: &port,
 	}
 
-	err = client.ConfigureDevice(ifName, cfg)
-	if err != nil {
-		log.Printf("Failed to configure %s, trying to create it via wireguard-go... (%v)", ifName, err)
-		exec.Command("wireguard-go", ifName).Run()
-		time.Sleep(1 * time.Second)
-		err = client.ConfigureDevice(ifName, cfg)
-		if err != nil {
-			return fmt.Errorf("configure device %s: %w", ifName, err)
-		}
+	if err := configureDeviceWithFallback(client, ifName, cfg); err != nil {
+		return err
 	}
 
-	exec.Command("ifconfig", ifName, "inet6", ipv6+"/128", "alias").Run()
-	exec.Command("ifconfig", ifName, "mtu", "1280").Run()
-	exec.Command("ifconfig", ifName, "up").Run()
+	configureIface(ifName, ipv6)
 
 	return nil
 }
@@ -203,33 +253,51 @@ func syncPeers(client *wgctrl.Client, ifName string, wgPriv []byte, npub string)
 	var wgPeers []wgtypes.PeerConfig
 
 	for _, p := range peers {
-		peerNpub := p["id"].(string)
+		peerNpub := p.ID
 		if peerNpub == npub {
 			continue
 		}
 
-		peerWgPubHex := p["wg_pubkey"].(string)
-		peerWgPubBytes, _ := hex.DecodeString(peerWgPubHex)
-		var peerWgPub wgtypes.Key
-		copy(peerWgPub[:], peerWgPubBytes)
+		cacheKey := npub + ":" + peerNpub
 
-		peerIPv6 := p["ipv6"].(string)
-		_, peerIPNet, _ := net.ParseCIDR(peerIPv6 + "/128")
+		cacheMu.RLock()
+		entry, ok := peerCache[cacheKey]
+		cacheMu.RUnlock()
+
+		if !ok {
+			peerWgPubHex := p.WGPubKey
+			peerWgPubBytes, _ := hex.DecodeString(peerWgPubHex)
+			var peerWgPub wgtypes.Key
+			copy(peerWgPub[:], peerWgPubBytes)
+
+			peerIPv6 := p.IPv6
+			_, peerIPNet, _ := net.ParseCIDR(peerIPv6 + "/128")
+
+			var psk wgtypes.Key
+			pskBytes := proto.DerivePSK(npub, peerNpub)
+			copy(psk[:], pskBytes)
+
+			entry = peerCacheEntry{
+				wgPub: peerWgPub,
+				ipNet: *peerIPNet,
+				psk:   psk,
+			}
+
+			cacheMu.Lock()
+			peerCache[cacheKey] = entry
+			cacheMu.Unlock()
+		}
 
 		var endpoint *net.UDPAddr
 		if epStr, ok := endpoints[peerNpub]; ok && epStr != "" {
 			endpoint, _ = net.ResolveUDPAddr("udp", epStr)
 		}
 
-		var psk wgtypes.Key
-		pskBytes := proto.DerivePSK(npub, peerNpub)
-		copy(psk[:], pskBytes)
-
 		wgPeers = append(wgPeers, wgtypes.PeerConfig{
-			PublicKey:         peerWgPub,
-			PresharedKey:      &psk,
+			PublicKey:         entry.wgPub,
+			PresharedKey:      &entry.psk,
 			ReplaceAllowedIPs: true,
-			AllowedIPs:        []net.IPNet{*peerIPNet},
+			AllowedIPs:        []net.IPNet{entry.ipNet},
 			Endpoint:          endpoint,
 		})
 	}
