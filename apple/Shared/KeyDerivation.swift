@@ -11,10 +11,11 @@ struct KeyDerivation {
     /// Decode an nsec into a 32-byte Ed25519 seed
     static func decodeNsec(_ nsec: String) throws -> Data {
         if nsec.hasPrefix("nsec1") {
-            // Simplified bech32 logic for stubbing, or assume caller provides decoded hex for MVP
-            // Normally we'd use a real bech32 library here
-            // Let's assume we implement a simple one or fall back to hex.
-            throw KeyDerivationError.invalidNsec
+            let (hrp, data) = try Bech32.decode(nsec)
+            if hrp != "nsec" {
+                throw KeyDerivationError.invalidNsec
+            }
+            return try Bech32.convertBits(data: data, fromBits: 5, toBits: 8, pad: false)
         } else {
             return try hexStringToData(nsec)
         }
@@ -84,5 +85,84 @@ struct KeyDerivation {
             index = nextIndex
         }
         return data
+    }
+}
+
+private struct Bech32 {
+    private static let charset = Array("qpzry9x8gf2tvdw0s3jn54khce6mua7l")
+    private static let generator: [UInt32] = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3]
+
+    static func polymod(_ values: [UInt8]) -> UInt32 {
+        var chk: UInt32 = 1
+        for v in values {
+            let top = chk >> 25
+            chk = (chk & 0x1ffffff) << 5 ^ UInt32(v)
+            for i in 0..<5 {
+                if (top >> i) & 1 != 0 {
+                    chk ^= generator[i]
+                }
+            }
+        }
+        return chk
+    }
+
+    static func hrpExpand(_ hrp: String) -> [UInt8] {
+        var ret: [UInt8] = []
+        for c in hrp.utf8 {
+            ret.append(c >> 5)
+        }
+        ret.append(0)
+        for c in hrp.utf8 {
+            ret.append(c & 31)
+        }
+        return ret
+    }
+
+    static func verifyChecksum(hrp: String, data: [UInt8]) -> Bool {
+        return polymod(hrpExpand(hrp) + data) == 1
+    }
+
+    static func decode(_ bechString: String) throws -> (hrp: String, data: [UInt8]) {
+        let lower = bechString.lowercased()
+        guard let pos = lower.lastIndex(of: "1") else { throw KeyDerivationError.decodeError }
+        let hrp = String(lower[..<pos])
+        let dataStr = lower[lower.index(after: pos)...]
+
+        var data: [UInt8] = []
+        for c in dataStr {
+            guard let idx = charset.firstIndex(of: c) else { throw KeyDerivationError.decodeError }
+            data.append(UInt8(idx))
+        }
+        guard verifyChecksum(hrp: hrp, data: data) else { throw KeyDerivationError.decodeError }
+        return (hrp, Array(data.dropLast(6)))
+    }
+
+    static func convertBits(data: [UInt8], fromBits: Int, toBits: Int, pad: Bool) throws -> Data {
+        var acc: Int = 0
+        var bits: Int = 0
+        let maxv: Int = (1 << toBits) - 1
+        let maxAcc: Int = (1 << (fromBits + toBits - 1)) - 1
+        var out = Data()
+
+        for value in data {
+            let v = Int(value)
+            if v < 0 || (v >> fromBits) != 0 {
+                throw KeyDerivationError.decodeError
+            }
+            acc = ((acc << fromBits) | v) & maxAcc
+            bits += fromBits
+            while bits >= toBits {
+                bits -= toBits
+                out.append(UInt8((acc >> bits) & maxv))
+            }
+        }
+        if pad {
+            if bits > 0 {
+                out.append(UInt8((acc << (toBits - bits)) & maxv))
+            }
+        } else if bits >= fromBits || ((acc << (toBits - bits)) & maxv) != 0 {
+            throw KeyDerivationError.decodeError
+        }
+        return out
     }
 }
