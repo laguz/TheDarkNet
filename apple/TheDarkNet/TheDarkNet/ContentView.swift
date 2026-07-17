@@ -3,6 +3,7 @@ import SwiftUI
 #if os(macOS)
 import AppKit
 internal import Combine
+import ServiceManagement
 #endif
 
 // MARK: - Tunnel model
@@ -119,8 +120,14 @@ final class UserspaceAgentController {
             try FileManager.default.setAttributes([.posixPermissions: 0o644],
                                                   ofItemAtPath: dest.path)
 
-            _ = try? runLaunchctl(["bootout", "gui/\(uid)", dest.path])
-            try runLaunchctl(["bootstrap", "gui/\(uid)", dest.path])
+            if #available(macOS 13.0, *) {
+                let agent = SMAppService.agent(plistName: "\(name).plist")
+                try? agent.unregister() // ignore error if not registered
+                try agent.register()
+            } else {
+                _ = try? runLaunchctl(["bootout", "gui/\(uid)", dest.path])
+                try runLaunchctl(["bootstrap", "gui/\(uid)", dest.path])
+            }
             installed.append(name)
         }
         return installed
@@ -130,7 +137,12 @@ final class UserspaceAgentController {
         let uid = getuid()
         for name in ["com.thedarknet.agent", "com.thedarknet.hyperd"] {
             let plist = UserspacePaths.agentsDir.appendingPathComponent("\(name).plist")
-            _ = try? runLaunchctl(["bootout", "gui/\(uid)", plist.path])
+            if #available(macOS 13.0, *) {
+                let agent = SMAppService.agent(plistName: "\(name).plist")
+                try? agent.unregister()
+            } else {
+                _ = try? runLaunchctl(["bootout", "gui/\(uid)", plist.path])
+            }
             try? FileManager.default.removeItem(at: plist)
         }
     }
