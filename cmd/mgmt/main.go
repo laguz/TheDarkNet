@@ -98,16 +98,10 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
-	if err != nil {
-		http.Error(w, "Error reading body", http.StatusBadRequest)
-		return
-	}
-
 	var req struct {
 		Event nostr.Event `json:"event"`
 	}
-	if err := json.Unmarshal(body, &req); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
