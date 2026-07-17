@@ -136,6 +136,15 @@ final class UserspaceAgentController {
     func uninstall() {
         let uid = getuid()
         for name in ["com.thedarknet.agent", "com.thedarknet.hyperd"] {
+            if #available(macOS 13.0, *) {
+                #if os(macOS)
+                let service = SMAppService.agent(plistName: "\(name).plist")
+                try? service.unregister()
+                #endif
+            } else {
+                let plist = UserspacePaths.agentsDir.appendingPathComponent("\(name).plist")
+                _ = try? runLaunchctl(["bootout", "gui/\(uid)", plist.path])
+            }
             let plist = UserspacePaths.agentsDir.appendingPathComponent("\(name).plist")
             if #available(macOS 13.0, *) {
                 let agent = SMAppService.agent(plistName: "\(name).plist")
@@ -601,6 +610,14 @@ final class TunnelViewModel: ObservableObject {
             try FileManager.default.setAttributes(
                 [.posixPermissions: 0o600], ofItemAtPath: nsecURL.path
             )
+
+            // Start launchd agents
+            // In a real app we'd use SMAppService.agent(plistName: "com.thedarknet.agent.plist").register()
+            if #available(macOS 13.0, *) {
+                #if os(macOS)
+                try? SMAppService.agent(plistName: "com.thedarknet.agent.plist").register()
+                #endif
+            }
         } catch {
             lastError = "Couldn't write nsec: \(error.localizedDescription)"
         }
