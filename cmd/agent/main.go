@@ -176,7 +176,9 @@ func setupWireGuard(wgPriv []byte, ipv6 string) error {
 	err = client.ConfigureDevice(ifName, cfg)
 	if err != nil {
 		log.Printf("Failed to configure %s, trying to create it via wireguard-go... (%v)", ifName, err)
-		exec.Command("wireguard-go", ifName).Run()
+		if out, err := exec.Command("wireguard-go", ifName).CombinedOutput(); err != nil {
+			log.Printf("Warning: wireguard-go failed: %v, output: %s", err, string(out))
+		}
 		time.Sleep(1 * time.Second)
 		err = client.ConfigureDevice(ifName, cfg)
 		if err != nil {
@@ -184,9 +186,15 @@ func setupWireGuard(wgPriv []byte, ipv6 string) error {
 		}
 	}
 
-	exec.Command("ifconfig", ifName, "inet6", ipv6+"/128", "alias").Run()
-	exec.Command("ifconfig", ifName, "mtu", "1280").Run()
-	exec.Command("ifconfig", ifName, "up").Run()
+	if out, err := exec.Command("ifconfig", ifName, "inet6", ipv6+"/128", "alias").CombinedOutput(); err != nil {
+		log.Printf("Warning: failed to add ipv6 alias: %v, output: %s", err, string(out))
+	}
+	if out, err := exec.Command("ifconfig", ifName, "mtu", "1280").CombinedOutput(); err != nil {
+		log.Printf("Warning: failed to set mtu: %v, output: %s", err, string(out))
+	}
+	if out, err := exec.Command("ifconfig", ifName, "up").CombinedOutput(); err != nil {
+		log.Printf("Warning: failed to bring interface up: %v, output: %s", err, string(out))
+	}
 
 	return nil
 }

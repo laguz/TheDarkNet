@@ -26,7 +26,7 @@ var (
 func init() {
 	secret := os.Getenv("TDN_JWT_SECRET")
 	if secret == "" {
-		log.Fatal("TDN_JWT_SECRET environment variable is required")
+		log.Fatalf("TDN_JWT_SECRET environment variable is required")
 	}
 	jwtSecret = []byte(secret)
 }
