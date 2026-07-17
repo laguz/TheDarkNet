@@ -121,11 +121,9 @@ final class UserspaceAgentController {
                                                   ofItemAtPath: dest.path)
 
             if #available(macOS 13.0, *) {
-                #if os(macOS)
-                let service = SMAppService.agent(plistName: "\(name).plist")
-                try? service.unregister()
-                try service.register()
-                #endif
+                let agent = SMAppService.agent(plistName: "\(name).plist")
+                try? agent.unregister() // ignore error if not registered
+                try agent.register()
             } else {
                 _ = try? runLaunchctl(["bootout", "gui/\(uid)", dest.path])
                 try runLaunchctl(["bootstrap", "gui/\(uid)", dest.path])
@@ -148,6 +146,12 @@ final class UserspaceAgentController {
                 _ = try? runLaunchctl(["bootout", "gui/\(uid)", plist.path])
             }
             let plist = UserspacePaths.agentsDir.appendingPathComponent("\(name).plist")
+            if #available(macOS 13.0, *) {
+                let agent = SMAppService.agent(plistName: "\(name).plist")
+                try? agent.unregister()
+            } else {
+                _ = try? runLaunchctl(["bootout", "gui/\(uid)", plist.path])
+            }
             try? FileManager.default.removeItem(at: plist)
         }
     }
