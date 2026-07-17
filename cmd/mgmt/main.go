@@ -26,7 +26,7 @@ var (
 func init() {
 	secret := os.Getenv("TDN_JWT_SECRET")
 	if secret == "" {
-		secret = "thedarknet-jwt-secret-dev" // MVP secret fallback
+		log.Fatalf("TDN_JWT_SECRET environment variable is required")
 	}
 	jwtSecret = []byte(secret)
 }
