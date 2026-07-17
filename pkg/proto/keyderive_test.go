@@ -61,17 +61,20 @@ func TestDecodeNsec(t *testing.T) {
 	tests := []struct {
 		name    string
 		nsec    string
+		wantHex string
 		wantErr bool
 	}{
-		{"valid hex", validHex, false},
-		{"invalid hex length (too short)", validHex[:63], true},
-		{"invalid hex length (too long)", validHex + "0", true},
-		{"invalid hex characters", "z" + validHex[1:], true},
-		{"empty string", "", true},
-		{"nsec1 prefix but too short", "nsec1", true},
-		{"nsec1 prefix with invalid bech32", "nsec1invalidchars!!", true},
-		{"invalid bech32 nsec1 (too short)", "nsec1qqqq", true},
-		{"invalid bech32 nsec1 (invalid checksum)", "nsec1800d642clcd630czradxe7ww9665v066v2ueu7863p6f7sc94x7shnll07", true},
+		{"valid hex", validHex, validHex, false},
+		{"invalid hex length (too short)", validHex[:63], "", true},
+		{"invalid hex length (too long)", validHex + "0", "", true},
+		{"invalid hex characters", "z" + validHex[1:], "", true},
+		{"empty string", "", "", true},
+		{"nsec1 prefix but too short", "nsec1", "", true},
+		{"nsec1 prefix with invalid bech32", "nsec1invalidchars!!", "", true},
+		{"invalid bech32 nsec1 (too short)", "nsec1qqqq", "", true},
+		{"invalid bech32 nsec1 (invalid checksum)", "nsec1800d642clcd630czradxe7ww9665v066v2ueu7863p6f7sc94x7shnll07", "", true},
+		{"valid bech32 nsec1 but wrong data length (31 bytes)", "nsec1xqcnqv3sxvcrgvp4xqmrqdes8qcrjvrpxp3rqcesvscx2vrxxymgnvhq", "", true},
+		{"valid bech32 nsec1", "nsec14w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w4s5l3rd9", validHex, false},
 	}
 
 	for _, tt := range tests {
@@ -81,8 +84,8 @@ func TestDecodeNsec(t *testing.T) {
 				t.Errorf("DecodeNsec(%q) error = %v, wantErr %v", tt.nsec, err, tt.wantErr)
 				return
 			}
-			if !tt.wantErr && hex.EncodeToString(got) != tt.nsec {
-				t.Errorf("DecodeNsec(%q) = %x, want %s", tt.nsec, got, tt.nsec)
+			if !tt.wantErr && hex.EncodeToString(got) != tt.wantHex {
+				t.Errorf("DecodeNsec(%q) = %x, want %s", tt.nsec, got, tt.wantHex)
 			}
 		})
 	}
