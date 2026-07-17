@@ -175,6 +175,34 @@ func isValidIface(ifName string) bool {
 	return ifaceNameRegex.MatchString(ifName)
 }
 
+func configureDeviceWithFallback(client *wgctrl.Client, ifName string, cfg wgtypes.Config) error {
+	err := client.ConfigureDevice(ifName, cfg)
+	if err != nil {
+		log.Printf("Failed to configure %s, trying to create it via wireguard-go... (%v)", ifName, err)
+		if out, err := exec.Command("wireguard-go", ifName).CombinedOutput(); err != nil {
+			log.Printf("Warning: wireguard-go failed: %v, output: %s", err, string(out))
+		}
+		time.Sleep(1 * time.Second)
+		err = client.ConfigureDevice(ifName, cfg)
+		if err != nil {
+			return fmt.Errorf("configure device %s: %w", ifName, err)
+		}
+	}
+	return nil
+}
+
+func configureIface(ifName string, ipv6 string) {
+	if out, err := exec.Command("ifconfig", ifName, "inet6", ipv6+"/128", "alias").CombinedOutput(); err != nil {
+		log.Printf("Warning: failed to add ipv6 alias: %v, output: %s", err, string(out))
+	}
+	if out, err := exec.Command("ifconfig", ifName, "mtu", "1280").CombinedOutput(); err != nil {
+		log.Printf("Warning: failed to set mtu: %v, output: %s", err, string(out))
+	}
+	if out, err := exec.Command("ifconfig", ifName, "up").CombinedOutput(); err != nil {
+		log.Printf("Warning: failed to bring interface up: %v, output: %s", err, string(out))
+	}
+}
+
 func setupWireGuard(wgPriv []byte, ipv6 string) error {
 	ifName := wgIface
 	if !isValidIface(ifName) {
@@ -196,28 +224,11 @@ func setupWireGuard(wgPriv []byte, ipv6 string) error {
 		ListenPort: &port,
 	}
 
-	err = client.ConfigureDevice(ifName, cfg)
-	if err != nil {
-		log.Printf("Failed to configure %s, trying to create it via wireguard-go... (%v)", ifName, err)
-		if out, err := exec.Command("wireguard-go", ifName).CombinedOutput(); err != nil {
-			log.Printf("Warning: wireguard-go failed: %v, output: %s", err, string(out))
-		}
-		time.Sleep(1 * time.Second)
-		err = client.ConfigureDevice(ifName, cfg)
-		if err != nil {
-			return fmt.Errorf("configure device %s: %w", ifName, err)
-		}
+	if err := configureDeviceWithFallback(client, ifName, cfg); err != nil {
+		return err
 	}
 
-	if out, err := exec.Command("ifconfig", ifName, "inet6", ipv6+"/128", "alias").CombinedOutput(); err != nil {
-		log.Printf("Warning: failed to add ipv6 alias: %v, output: %s", err, string(out))
-	}
-	if out, err := exec.Command("ifconfig", ifName, "mtu", "1280").CombinedOutput(); err != nil {
-		log.Printf("Warning: failed to set mtu: %v, output: %s", err, string(out))
-	}
-	if out, err := exec.Command("ifconfig", ifName, "up").CombinedOutput(); err != nil {
-		log.Printf("Warning: failed to bring interface up: %v, output: %s", err, string(out))
-	}
+	configureIface(ifName, ipv6)
 
 	return nil
 }
@@ -319,7 +330,7 @@ func main() {
 	log.Println("Logged into mgmt")
 
 	ifName := wgIface
-	if err := setupWireGuard(ifName, wgPriv, ipv6); err != nil {
+	if err := setupWireGuard(wgPriv, ipv6); err != nil {
 		log.Printf("WireGuard setup error: %v", err)
 	}
 
