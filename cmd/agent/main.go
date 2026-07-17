@@ -155,9 +155,7 @@ func getEndpointsFromHyperd() (map[string]string, error) {
 	return endpoints, nil
 }
 
-func setupWireGuard(wgPriv []byte, ipv6 string) error {
-	ifName := wgIface
-
+func setupWireGuard(ifName string, wgPriv []byte, ipv6 string) error {
 	client, err := wgctrl.New()
 	if err != nil {
 		return fmt.Errorf("wgctrl new: %w", err)
@@ -270,7 +268,7 @@ func main() {
 	log.Println("Logged into mgmt")
 
 	ifName := wgIface
-	if err := setupWireGuard(wgPriv, ipv6); err != nil {
+	if err := setupWireGuard(ifName, wgPriv, ipv6); err != nil {
 		log.Printf("WireGuard setup error: %v", err)
 	}
 
