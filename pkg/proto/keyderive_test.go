@@ -64,6 +64,7 @@ func TestDecodeNsec(t *testing.T) {
 	tests := []struct {
 		name    string
 		nsec    string
+		wantHex string
 		wantErr bool
 	}{
 		{"valid hex", validHex, false},
