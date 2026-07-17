@@ -3,6 +3,8 @@ package proto
 import (
 	"encoding/hex"
 	"testing"
+
+	"github.com/nbd-wtf/go-nostr/nip19"
 )
 
 func TestKeyDerivations(t *testing.T) {
@@ -57,6 +59,7 @@ func TestDecodeNsec(t *testing.T) {
 		validSeed[i] = 0xab
 	}
 	validHex := hex.EncodeToString(validSeed)
+	validNsec, _ := nip19.EncodePrivateKey(validHex)
 
 	tests := []struct {
 		name    string
@@ -64,6 +67,7 @@ func TestDecodeNsec(t *testing.T) {
 		wantErr bool
 	}{
 		{"valid hex", validHex, false},
+		{"valid bech32 nsec1", validNsec, false},
 		{"invalid hex length (too short)", validHex[:63], true},
 		{"invalid hex length (too long)", validHex + "0", true},
 		{"invalid hex characters", "z" + validHex[1:], true},
@@ -81,8 +85,8 @@ func TestDecodeNsec(t *testing.T) {
 				t.Errorf("DecodeNsec(%q) error = %v, wantErr %v", tt.nsec, err, tt.wantErr)
 				return
 			}
-			if !tt.wantErr && hex.EncodeToString(got) != tt.nsec {
-				t.Errorf("DecodeNsec(%q) = %x, want %s", tt.nsec, got, tt.nsec)
+			if !tt.wantErr && hex.EncodeToString(got) != validHex {
+				t.Errorf("DecodeNsec(%q) = %x, want %s", tt.nsec, hex.EncodeToString(got), validHex)
 			}
 		})
 	}
