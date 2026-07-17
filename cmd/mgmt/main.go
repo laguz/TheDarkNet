@@ -26,7 +26,7 @@ var (
 func init() {
 	secret := os.Getenv("TDN_JWT_SECRET")
 	if secret == "" {
-		secret = "thedarknet-jwt-secret-dev" // MVP secret fallback
+		log.Fatalf("TDN_JWT_SECRET environment variable is required")
 	}
 	jwtSecret = []byte(secret)
 }
@@ -98,7 +98,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
 		http.Error(w, "Error reading body", http.StatusBadRequest)
 		return
@@ -113,7 +113,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	event := req.Event
-	if event.Kind != 27235 || event.Content != "thedarknet-login" {
+	if event.Kind != proto.LoginEventKind || event.Content != proto.LoginEventContent {
 		http.Error(w, "Invalid event kind or content", http.StatusBadRequest)
 		return
 	}

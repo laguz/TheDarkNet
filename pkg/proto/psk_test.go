@@ -38,3 +38,12 @@ func TestDerivePSK(t *testing.T) {
 		t.Errorf("DerivePSK known value mismatch: got %s, want %s", hex.EncodeToString(psk1), expectedHex)
 	}
 }
+
+func BenchmarkDerivePSK(b *testing.B) {
+	npub1 := "npub1"
+	npub2 := "npub2"
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		DerivePSK(npub1, npub2)
+	}
+}
